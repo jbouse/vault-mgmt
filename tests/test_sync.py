@@ -8,6 +8,7 @@ def test_create_parser():
     sync.create_parser(parser)
     assert isinstance(parser, argparse.ArgumentParser)
 
+
 def test_main_help(capsys):
     parser = argparse.ArgumentParser()
     sync.create_parser(parser)
@@ -15,6 +16,7 @@ def test_main_help(capsys):
         parser.parse_args(['--help'])
     except SystemExit as e:
         assert e.code == 0
+
 
 def test_main_minimal(monkeypatch):
     parser = argparse.ArgumentParser()
