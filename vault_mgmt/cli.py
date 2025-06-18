@@ -55,14 +55,6 @@ def main():
     parser = create_parser()
     args = parser.parse_args()
 
-    # # Parse the arguments.
-    # # We parse the arguments after the command name.
-    # if len(sys.argv) > 1:
-    #     args = parser.parse_args(sys.argv[1:])
-    # else:
-    #     parser.print_help()
-    #     sys.exit(1)
-
     # Call the appropriate main function based on the command
     if args.command == "compare":
         compare.main(args)

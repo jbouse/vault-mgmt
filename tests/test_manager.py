@@ -60,17 +60,20 @@ def test_authenticate_with_oidc_success(monkeypatch):
     monkeypatch.setattr(m, '_login_oidc_get_token', lambda: 'dummy_code')
     client = m.authenticate_with_oidc(oidc_role='test-role')
     assert client.token == 'token123'  # type: ignore
-    assert m.client.token == 'token123' # type: ignore
+    assert m.client.token == 'token123'  # type: ignore
 
 
 def test_authenticate_with_oidc_failure(monkeypatch):
     m = manager.VaultManager('http://localhost:8200')
+
     class FailingOIDC:
         def oidc_authorization_url_request(self, role, redirect_uri):
             raise Exception('fail')
+
     class FailingAuth:
         def __init__(self):
             self.oidc = FailingOIDC()
+
     class FailingClient:
         def __init__(self, url=None):
             self.auth = FailingAuth()
