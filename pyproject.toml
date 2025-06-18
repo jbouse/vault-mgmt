@@ -38,8 +38,9 @@ dependencies = [
 ]
 
 [projects.urls]
-github = "https://github.com/ugns/vault-mgmt"
-issues = "https://github.com/ugns/vault-mgmt/issues"
+GitHub = "https://github.com/jbouse/vault-mgmt"
+Issues = "https://github.com/jbouse/vault-mgmt/issues"
+ChangeLog = "https://github.com/jbouse/vault-mgmt/blob/main/CHANGELOG.md"
 
 [project.scripts]
 vault-mgmt = "vault_mgmt.cli:main"
@@ -67,3 +68,9 @@ select = [
 [tool.ruff]
 line-length = 127
 indent-width = 4
+
+[tool.semantic_release]
+version_variable = "vault_mgmt/__init__.py:__version__"
+branch = "main"
+upload_to_pypi = false
+changelog_file = "CHANGELOG.md"

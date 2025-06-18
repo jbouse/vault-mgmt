@@ -4,7 +4,8 @@ A collection of CLI tools for managing, comparing, migrating, and rolling out Ha
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Python Versions](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
-[![GitHub Issues](https://img.shields.io/github/issues/ugns/vault-mgmt.svg)](https://github.com/ugns/vault-mgmt/issues)
+[![GitHub Issues](https://img.shields.io/github/issues/jbouse/vault-mgmt.svg)](https://github.com/jbouse/vault-mgmt/issues)
+[![codecov](https://codecov.io/gh/jbouse/vault-mgmt/branch/main/graph/badge.svg)](https://codecov.io/gh/jbouse/vault-mgmt)
 
 ---
 
@@ -37,6 +38,8 @@ The toolkit provides a unified CLI:
 ```bash
 vault-mgmt [command] [options]
 ```
+
+All commands support `--help` for more options.
 
 ---
 
@@ -81,16 +84,16 @@ vault-mgmt rollout vault-namespace --vault-addr ... --kube-context ...
 
 ## Dependencies
 
-| Package            | Version    | Description                                    |
-|--------------------|-----------|------------------------------------------------|
-| `hvac`             | 2.1.0     | Python client for HashiCorp Vault API          |
-| `kubernetes`       | 29.0.0    | Python client for Kubernetes API               |
-| `requests`         | 2.32.3    | Elegant HTTP library (dependency of `hvac`)    |
-| `tqdm`             | 4.66.4    | Progress bar for loops and iterables           |
-| `certifi`          | 2024.6.2  | Mozilla's root certificates for SSL/TLS        |
-| `charset-normalizer`| 3.3.2    | Character set/encoding detection               |
-| `idna`             | 3.7       | Internationalized Domain Names in Applications |
-| `urllib3`          | 2.2.1     | HTTP client for Python (dependency of requests)|
+| Package              | Version    | Description                                    |
+|----------------------|-----------|------------------------------------------------|
+| `hvac`               | 2.3.0     | Python client for HashiCorp Vault API          |
+| `kubernetes`         | 33.1.0    | Python client for Kubernetes API               |
+| `requests`           | 2.32.4    | Elegant HTTP library (dependency of `hvac`)    |
+| `tqdm`               | 4.67.1    | Progress bar for loops and iterables           |
+| `certifi`            | 2025.6.15 | Mozilla's root certificates for SSL/TLS        |
+| `charset-normalizer` | 3.4.2     | Character set/encoding detection               |
+| `idna`               | 3.10      | Internationalized Domain Names in Applications |
+| `urllib3`            | 2.5.0     | HTTP client for Python (dependency of `requests`)|
 
 ---
 
@@ -107,8 +110,9 @@ vault-mgmt rollout vault-namespace --vault-addr ... --kube-context ...
 
 ## Links
 
-- [GitHub Repository](https://github.com/ugns/vault-mgmt)
-- [Issue Tracker](https://github.com/ugns/vault-mgmt/issues)
+- [GitHub Repository](https://github.com/jbouse/vault-mgmt)
+- [Issue Tracker](https://github.com/jbouse/vault-mgmt/issues)
+- [Changelog](https://github.com/jbouse/vault-mgmt/blob/main/CHANGELOG.md)
 
 ---
 
