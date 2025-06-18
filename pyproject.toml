@@ -30,7 +30,7 @@ dependencies = [
     "certifi==2024.6.2",
     "charset-normalizer==3.3.2",
     "hvac==2.3.0",
-    "idna==3.7",
+    "idna==3.10",
     "kubernetes==29.0.0",
     "requests==2.32.3",
     "urllib3==2.2.1",
