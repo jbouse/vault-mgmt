@@ -27,7 +27,7 @@ classifiers = [
     "Topic :: Utilities",
 ]
 dependencies = [
-    "certifi==2024.6.2",
+    "certifi==2024.12.14",
     "charset-normalizer==3.4.2",
     "hvac==2.3.0",
     "idna==3.10",
