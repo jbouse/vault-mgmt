@@ -17,8 +17,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install flake8
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    - name: Install package (editable)
+      run: |
+        pip install -e .
     - name: Build coverage file
       run: |
-        pytest --cache-clear --cov=vault_mgmt vault_mgmt/ | tee pytest-coverage.txt
+        pytest --cache-clear --cov=vault_mgmt --cov-report=term-missing | tee pytest-coverage.txt
     - name: Comment coverage
       uses: coroo/pytest-coverage-commentator@v1.0.2
