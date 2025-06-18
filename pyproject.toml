@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vault-mgmt"
+dynamic = ["version"]
+authors = [
+  { name="Jeremy T. Bouse", email="Jeremy.Bouse@UnderGrid.net" },
+]
+description = "A collection of CLI tools for managing HashiCorp Vault."
+readme = "README.md"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: POSIX",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Information Technology",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "certifi==2024.6.2",
+    "charset-normalizer==3.3.2",
+    "hvac==2.1.0",
+    "idna==3.7",
+    "kubernetes==29.0.0",
+    "requests==2.32.3",
+    "urllib3==2.2.1",
+    "tqdm==4.66.4",
+]
+
+[projects.urls]
+github = "https://github.com/ugns/vault-mgmt"
+issues = "https://github.com/ugns/vault-mgmt/issues"
+
+[project.scripts]
+vault-mgmt = "vault_mgmt.cli:main"
+
+# This new section tells setuptools where to find the dynamic version
+[tool.setuptools.dynamic]
+version = {attr = "vault_mgmt.__version__"}
+
+[tool.ruff.lint]
+select = [
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # flake8-simplify
+    "SIM",
+    # isort
+    "I",
+]
+
+[tool.ruff]
+line-length = 127
+indent-width = 4
