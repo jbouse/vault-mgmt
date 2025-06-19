@@ -32,6 +32,7 @@ coverage.xml
 .hypothesis/
 .tox/
 .ruff_cache/
+junit.xml
 
 # MyPy / Pyright / other tooling
 .mypy_cache/
