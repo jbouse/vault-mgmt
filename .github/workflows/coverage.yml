@@ -1,7 +1,10 @@
 name: Code Coverage
+
+# Required permissions for coverage workflow
 permissions:
-  contents: read
-  pull-requests: write
+  contents: read        # Read repository contents
+  pull-requests: write  # Post coverage comments on PRs
+
 on:
   pull_request:
     branches: 
@@ -37,13 +40,13 @@ jobs:
       with:
         files: ./junit.xml
         flags: python3
-        name: codecov-umbrella-test-results
         token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false  # Don't fail CI if codecov upload fails
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
       with:
         files: ./coverage.xml
         flags: unittests
-        name: codecov-umbrella
         token: ${{ secrets.CODECOV_TOKEN }}
+        fail_ci_if_error: false  # Don't fail CI if codecov upload fails
