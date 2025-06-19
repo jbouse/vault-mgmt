@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vault-mgmt"
-dynamic = ["version"]
+version = "0.1.0"
 authors = [
   { name="Jeremy T. Bouse", email="Jeremy.Bouse@UnderGrid.net" },
 ]
@@ -45,10 +45,6 @@ ChangeLog = "https://github.com/jbouse/vault-mgmt/blob/main/CHANGELOG.md"
 [project.scripts]
 vault-mgmt = "vault_mgmt.cli:main"
 
-# This new section tells setuptools where to find the dynamic version
-[tool.setuptools.dynamic]
-version = {attr = "vault_mgmt.__version__"}
-
 [tool.ruff.lint]
 select = [
     # pycodestyle
@@ -70,7 +66,7 @@ line-length = 127
 indent-width = 4
 
 [tool.semantic_release]
-version_variable = "vault_mgmt/__init__.py:__version__"
+version_toml = ["pyproject.toml:project.version"]
 branch = "main"
 upload_to_pypi = false
 changelog_file = "CHANGELOG.md"
