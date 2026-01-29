@@ -32,6 +32,11 @@ def create_parser(parser):
         "-b", "--base-path", default="", help="Base path for secrets to synchronize"
     )
     parser.add_argument(
+        "--mount-point",
+        default="secret",
+        help="Secret mount point to compare (default: secret).",
+    )
+    parser.add_argument(
         "-o",
         "--output-file",
         default=default_output,
@@ -56,8 +61,10 @@ def authenticate_vault(addr, oidc_role):
         return None
 
 
-def get_filtered_secret_paths(vault, base_path, ignore_paths):
-    paths = set(vault.list_all_secret_paths(base_path=base_path))
+def get_filtered_secret_paths(vault, base_path, ignore_paths, mount_point):
+    paths = set(
+        vault.list_all_secret_paths(base_path=base_path, mount_point=mount_point)
+    )
     for ignore in ignore_paths:
         paths = {p for p in paths if ignore not in p}
     return paths
@@ -107,22 +114,25 @@ def write_results_to_csv(results, args):
 
 def main(args):
     """Main logic for comparing secrets."""
+    mount_point = args.mount_point.strip("/") if args.mount_point else "secret"
     source_vault = authenticate_vault(args.source_vault_addr, args.oidc_role)
     if not source_vault:
         return
     destination_vault = authenticate_vault(args.destination_vault_addr, args.oidc_role)
     if not destination_vault:
         return
-    print(f"Listing secret paths from source Vault at base path '{args.base_path}/'...")
+    print(
+        f"Listing secret paths from source Vault at mount '{mount_point}' and base path '{args.base_path}/'..."
+    )
     source_secret_paths = get_filtered_secret_paths(
-        source_vault, args.base_path, args.ignore_path
+        source_vault, args.base_path, args.ignore_path, mount_point
     )
     print(f"Found {len(source_secret_paths)} secret paths in source.")
     print(
-        f"Listing secret paths from destination Vault at base path '{args.base_path}/'..."
+        f"Listing secret paths from destination Vault at mount '{mount_point}' and base path '{args.base_path}/'..."
     )
     destination_secret_paths = get_filtered_secret_paths(
-        destination_vault, args.base_path, args.ignore_path
+        destination_vault, args.base_path, args.ignore_path, mount_point
     )
     print(f"Found {len(destination_secret_paths)} secret paths in destination.")
     common_paths = source_secret_paths & destination_secret_paths

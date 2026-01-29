@@ -154,21 +154,37 @@ class VaultManager:
         self.kv_version_cache[mount_point] = version
         return version
 
-    def list_all_secret_paths(self, base_path=""):
+    def list_all_secret_paths(self, base_path="", mount_point="secret"):
         if not self.is_authenticated():
             raise Exception("Vault Client not authenticated.")
         all_paths = []
         try:
-            response = self.client.secrets.kv.list_secrets(path=base_path)  # type: ignore
+            version = self.get_kv_version(mount_point=mount_point)
+            if version == 1:
+                response = self.client.secrets.kv.v1.list_secrets(  # type: ignore
+                    path=base_path, mount_point=mount_point
+                )
+            elif version == 2:
+                response = self.client.secrets.kv.v2.list_secrets(  # type: ignore
+                    path=base_path, mount_point=mount_point
+                )
+            else:
+                raise ValueError(f"Unsupported KV version {version} at '{mount_point}'")
             keys = response["data"]["keys"]
             for key in keys:
                 full_path = (
                     f"{base_path}{key}" if base_path == "" else f"{base_path}/{key}"
                 )
                 if key.endswith("/"):
-                    all_paths.extend(self.list_all_secret_paths(full_path.rstrip("/")))
+                    all_paths.extend(
+                        self.list_all_secret_paths(
+                            full_path.rstrip("/"), mount_point=mount_point
+                        )
+                    )
                 else:
                     all_paths.append(full_path)
+        except hvac.exceptions.InvalidPath:  # type: ignore
+            return all_paths
         except Exception as e:
             print(f"Failed to list path '{base_path}' for {self.vault_addr}: {e}")
         return all_paths
