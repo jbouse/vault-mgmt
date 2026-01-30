@@ -129,6 +129,47 @@ def rollout_standby_pods(k8s_core_v1, namespace, strict):
         sys.exit(1)
 
 
+def _handle_timeout(message, strict):
+    if strict:
+        print(message)
+        sys.exit(1)
+    print(f"Warning: {message}")
+
+
+def _wait_for_new_leader(k8s_core_v1, namespace, old_active_pod_name, strict):
+    w = watch.Watch()
+    for event in w.stream(
+        k8s_core_v1.list_namespaced_pod,
+        namespace=namespace,
+        label_selector="vault-active=true",
+        timeout_seconds=120,
+    ):
+        pod = event["object"]  # type: ignore
+        if pod.metadata.name != old_active_pod_name and is_pod_ready(pod):  # type: ignore
+            w.stop()
+            return pod
+    _handle_timeout(
+        "Timed out waiting for a new active leader to become ready.", strict
+    )
+    return None
+
+
+def _wait_for_pod_restart(k8s_core_v1, namespace, pod_name, pod_uid, strict):
+    w = watch.Watch()
+    for event in w.stream(
+        k8s_core_v1.list_namespaced_pod,
+        namespace=namespace,
+        field_selector=f"metadata.name={pod_name}",
+        timeout_seconds=300,
+    ):
+        restarted_pod = event["object"]  # type: ignore
+        if restarted_pod.metadata.uid != pod_uid and is_pod_ready(restarted_pod):  # type: ignore
+            w.stop()
+            return restarted_pod
+    _handle_timeout(f"Timed out waiting for {pod_name} to restart.", strict)
+    return None
+
+
 def handle_active_pod(k8s_core_v1, namespace, vault_client, strict):
     print("\n--- Phase 2: Handling active pod ---")
     try:
@@ -150,26 +191,11 @@ def handle_active_pod(k8s_core_v1, namespace, vault_client, strict):
             vault_client.step_down()
             pbar.update(1)
             pbar.set_description("Waiting for new leader")
-            new_leader_ready = False
-            w = watch.Watch()
-            for event in w.stream(
-                k8s_core_v1.list_namespaced_pod,
-                namespace=namespace,
-                label_selector="vault-active=true",
-                timeout_seconds=120,
-            ):
-                pod = event["object"]  # type: ignore
-                if pod.metadata.name != old_active_pod_name and is_pod_ready(pod):  # type: ignore
-                    new_leader_ready = True
-                    pbar.set_description(f"New leader {pod.metadata.name} ready")  # type: ignore
-                    w.stop()
-                    break
-            if not new_leader_ready:
-                msg = "Timed out waiting for a new active leader to become ready."
-                if strict:
-                    print(msg)
-                    sys.exit(1)
-                print(f"Warning: {msg}")
+            new_leader = _wait_for_new_leader(
+                k8s_core_v1, namespace, old_active_pod_name, strict
+            )
+            if new_leader:
+                pbar.set_description(f"New leader {new_leader.metadata.name} ready")  # type: ignore
             pbar.update(1)
             pbar.set_description(f"Deleting old pod {old_active_pod_name}")
             k8s_core_v1.delete_namespaced_pod(
@@ -177,25 +203,13 @@ def handle_active_pod(k8s_core_v1, namespace, vault_client, strict):
             )
             pbar.update(1)
             pbar.set_description(f"Waiting for {old_active_pod_name} to restart")
-            old_pod_restarted = False
-            w = watch.Watch()
-            for event in w.stream(
-                k8s_core_v1.list_namespaced_pod,
-                namespace=namespace,
-                field_selector=f"metadata.name={old_active_pod_name}",
-                timeout_seconds=300,
-            ):
-                restarted_pod = event["object"]  # type: ignore
-                if restarted_pod.metadata.uid != old_active_pod_uid and is_pod_ready(restarted_pod):  # type: ignore
-                    old_pod_restarted = True
-                    w.stop()
-                    break
-            if not old_pod_restarted:
-                msg = f"Timed out waiting for {old_active_pod_name} to restart."
-                if strict:
-                    print(msg)
-                    sys.exit(1)
-                print(f"Warning: {msg}")
+            _wait_for_pod_restart(
+                k8s_core_v1,
+                namespace,
+                old_active_pod_name,
+                old_active_pod_uid,
+                strict,
+            )
             pbar.update(1)
         print("Vault rollout complete.")
         print("\nConfirming Vault version post-rollout...")

@@ -22,6 +22,6 @@ def test_main_minimal(monkeypatch):
     parser = argparse.ArgumentParser()
     rollout.create_parser(parser)
     args = parser.parse_args([
-        'vault', '--vault-addr', 'http://localhost:8200'
+        'vault', '--vault-addr', 'http://localhost:8200', '--strict'
     ])
     rollout.main(args)

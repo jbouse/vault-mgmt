@@ -15,6 +15,18 @@ class FakeSys:
         }
 
 
+class FakeSysWithVersion:
+    def __init__(self, health_version=None, seal_version=None):
+        self._health_version = health_version
+        self._seal_version = seal_version
+
+    def read_health_status(self):
+        return {"version": self._health_version}
+
+    def read_seal_status(self):
+        return {"version": self._seal_version}
+
+
 class FakeOIDC:
     def oidc_authorization_url_request(self, role, redirect_uri):
         return {"data": {"auth_url": "http://localhost:8250/oidc/callback?nonce=abc&state=xyz"}}
@@ -82,3 +94,27 @@ def test_authenticate_with_oidc_failure(monkeypatch):
     with pytest.raises(Exception) as excinfo:
         m.authenticate_with_oidc(oidc_role='test-role')
     assert str(excinfo.value) == 'fail'
+
+
+def test_get_vault_version_prefers_health():
+    m = manager.VaultManager('http://localhost:8200')
+    m.is_authenticated = lambda: True
+
+    class FakeClientWithSys:
+        def __init__(self):
+            self.sys = FakeSysWithVersion(health_version="1.2.3", seal_version="9.9.9")
+
+    m.client = FakeClientWithSys()  # type: ignore
+    assert m.get_vault_version() == "1.2.3"
+
+
+def test_get_vault_version_fallback_seal():
+    m = manager.VaultManager('http://localhost:8200')
+    m.is_authenticated = lambda: True
+
+    class FakeClientWithSys:
+        def __init__(self):
+            self.sys = FakeSysWithVersion(health_version=None, seal_version="2.3.4")
+
+    m.client = FakeClientWithSys()  # type: ignore
+    assert m.get_vault_version() == "2.3.4"

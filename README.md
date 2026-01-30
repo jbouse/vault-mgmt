@@ -48,7 +48,7 @@ All commands support `--help` for more options.
 ### Compare Vaults
 
 ```bash
-vault-mgmt compare --source-vault-addr ... --destination-vault-addr ... --output-file differences.csv
+vault-mgmt compare --source-vault-addr ... --destination-vault-addr ... --mount-point secret --base-path app --output-file differences.csv
 ```
 
 ### Sync Vaults with Overrides
@@ -60,8 +60,12 @@ vault-mgmt sync --source-vault-addr ... --destination-vault-addr ... --override-
 ### Kubernetes Rollout
 
 ```bash
-vault-mgmt rollout vault-namespace --vault-addr ... --kube-context ...
+vault-mgmt rollout vault-namespace --vault-addr ... --kube-context ... --strict
 ```
+
+The `--strict` flag exits non-zero when rollout steps time out instead of continuing.
+
+The OIDC browser callback listener binds to `127.0.0.1` and waits up to 5 minutes for the auth response.
 
 ---
 

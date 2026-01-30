@@ -29,7 +29,10 @@ def create_parser(parser):
     )
     parser.add_argument("-r", "--oidc-role", help="OIDC role for authentication")
     parser.add_argument(
-        "-b", "--base-path", default="", help="Base path for secrets to synchronize"
+        "-b",
+        "--base-path",
+        default="",
+        help="Base path within the mount to compare (default: root).",
     )
     parser.add_argument(
         "--mount-point",
