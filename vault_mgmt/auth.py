@@ -21,8 +21,8 @@ def load_auth_config(path: Optional[str]) -> dict[str, Any]:
     try:
         with open(path) as fin:
             data = yaml.safe_load(fin)
-    except FileNotFoundError:
-        raise ValueError(f"Auth config file not found at: {path}")
+    except FileNotFoundError as exc:
+        raise ValueError(f"Auth config file not found at: {path}") from exc
     if not data:
         return {}
     if not isinstance(data, dict):

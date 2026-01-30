@@ -110,8 +110,10 @@ class VaultManager:
         try:
             with open(auth_config.jwt_path) as fin:
                 jwt = fin.read().strip()
-        except FileNotFoundError:
-            raise ValueError(f"Kubernetes auth JWT file not found at: {auth_config.jwt_path}")
+        except FileNotFoundError as exc:
+            raise ValueError(
+                f"Kubernetes auth JWT file not found at: {auth_config.jwt_path}"
+            ) from exc
         try:
             response = self.client.auth.kubernetes.login(
                 role=auth_config.role,
