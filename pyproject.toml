@@ -28,7 +28,7 @@ classifiers = [
 ]
 dependencies = [
     "certifi==2025.11.12",
-    "charset-normalizer==3.4.2",
+    "charset-normalizer==3.4.4",
     "hvac==2.4.0",
     "idna==3.11",
     "kubernetes==33.1.0",
