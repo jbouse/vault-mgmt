@@ -3,6 +3,8 @@ import webbrowser
 
 import hvac
 
+from .auth import AuthConfig
+
 OIDC_CALLBACK_PORT = 8250
 OIDC_REDIRECT_URI = f"http://localhost:{OIDC_CALLBACK_PORT}/oidc/callback"
 SELF_CLOSING_PAGE = """
@@ -75,8 +77,17 @@ class VaultManager:
 
         class AuthHandler(BaseHTTPRequestHandler):
             def do_GET(self):
-                params = urllib.parse.parse_qs(self.path.split("?")[1])
-                self.server.token = params["code"][0]  # type: ignore
+                if "?" not in self.path:
+                    self.send_response(400)
+                    self.end_headers()
+                    return
+                params = urllib.parse.parse_qs(self.path.split("?", 1)[1])
+                code = params.get("code", [None])[0]
+                if not code:
+                    self.send_response(400)
+                    self.end_headers()
+                    return
+                self.server.token = code  # type: ignore
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(str.encode(SELF_CLOSING_PAGE))
@@ -84,10 +95,46 @@ class VaultManager:
             def log_message(self, format, *args):
                 pass  # Disable logging to the console
 
-        server_address = ("", OIDC_CALLBACK_PORT)
+        server_address = ("127.0.0.1", OIDC_CALLBACK_PORT)
         httpd = HttpServ(server_address, AuthHandler)
+        httpd.timeout = 300
         httpd.handle_request()
         return httpd.token
+
+    def authenticate_with_kubernetes(self, auth_config: AuthConfig):
+        if not auth_config.role:
+            raise ValueError("Kubernetes auth requires a role.")
+        if not auth_config.jwt_path:
+            raise ValueError("Kubernetes auth requires a JWT path.")
+        self.client = hvac.Client(url=self.vault_addr)
+        try:
+            with open(auth_config.jwt_path) as fin:
+                jwt = fin.read().strip()
+        except FileNotFoundError as exc:
+            raise ValueError(
+                f"Kubernetes auth JWT file not found at: {auth_config.jwt_path}"
+            ) from exc
+        try:
+            response = self.client.auth.kubernetes.login(
+                role=auth_config.role,
+                jwt=jwt,
+                mount_point=auth_config.mount or "kubernetes",
+            )
+            if response and "auth" in response and "client_token" in response["auth"]:
+                self.client.token = response["auth"]["client_token"]
+            return self.client
+        except Exception as e:
+            print(f"Kubernetes authentication failed for {self.vault_addr}: {e}")
+            raise
+
+    def authenticate(self, auth_config: AuthConfig, oidc_role=None):
+        method = auth_config.method or "oidc"
+        if method == "oidc":
+            role = auth_config.role or oidc_role
+            return self.authenticate_with_oidc(oidc_role=role)
+        if method == "kubernetes":
+            return self.authenticate_with_kubernetes(auth_config)
+        raise ValueError(f"Unsupported auth method: {method}")
 
     def is_authenticated(self):
         """Checks if the client is initialized and has a valid token."""
@@ -105,7 +152,11 @@ class VaultManager:
             return None
 
         try:
-            # The read_health_status method provides server information including the version
+            # Prefer health status for version; fall back to seal status if needed.
+            response = self.client.sys.read_health_status()  # type: ignore
+            version = response.get("version")
+            if version:
+                return version
             response = self.client.sys.read_seal_status()  # type: ignore
             return response.get("version")
         except hvac.exceptions.VaultError as e:  # type: ignore
@@ -154,21 +205,37 @@ class VaultManager:
         self.kv_version_cache[mount_point] = version
         return version
 
-    def list_all_secret_paths(self, base_path=""):
+    def list_all_secret_paths(self, base_path="", mount_point="secret"):
         if not self.is_authenticated():
             raise Exception("Vault Client not authenticated.")
         all_paths = []
         try:
-            response = self.client.secrets.kv.list_secrets(path=base_path)  # type: ignore
+            version = self.get_kv_version(mount_point=mount_point)
+            if version == 1:
+                response = self.client.secrets.kv.v1.list_secrets(  # type: ignore
+                    path=base_path, mount_point=mount_point
+                )
+            elif version == 2:
+                response = self.client.secrets.kv.v2.list_secrets(  # type: ignore
+                    path=base_path, mount_point=mount_point
+                )
+            else:
+                raise ValueError(f"Unsupported KV version {version} at '{mount_point}'")
             keys = response["data"]["keys"]
             for key in keys:
                 full_path = (
                     f"{base_path}{key}" if base_path == "" else f"{base_path}/{key}"
                 )
                 if key.endswith("/"):
-                    all_paths.extend(self.list_all_secret_paths(full_path.rstrip("/")))
+                    all_paths.extend(
+                        self.list_all_secret_paths(
+                            full_path.rstrip("/"), mount_point=mount_point
+                        )
+                    )
                 else:
                     all_paths.append(full_path)
+        except hvac.exceptions.InvalidPath:  # type: ignore
+            return all_paths
         except Exception as e:
             print(f"Failed to list path '{base_path}' for {self.vault_addr}: {e}")
         return all_paths

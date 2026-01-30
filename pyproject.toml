@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vault-mgmt"
-version = "1.0.0"
+version = "1.1.0"
 authors = [
   { name="Jeremy T. Bouse", email="Jeremy.Bouse@UnderGrid.net" },
 ]
@@ -27,13 +27,14 @@ classifiers = [
     "Topic :: Utilities",
 ]
 dependencies = [
-    "certifi==2025.6.15",
-    "charset-normalizer==3.4.2",
-    "hvac==2.3.0",
-    "idna==3.10",
+    "certifi==2025.11.12",
+    "charset-normalizer==3.4.4",
+    "hvac==2.4.0",
+    "idna==3.11",
     "kubernetes==33.1.0",
-    "requests==2.32.4",
-    "urllib3==2.5.0",
+    "PyYAML==6.0.3",
+    "requests==2.32.5",
+    "urllib3==2.6.3",
     "tqdm==4.67.1",
 ]
 
@@ -64,6 +65,9 @@ select = [
 [tool.ruff]
 line-length = 127
 indent-width = 4
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]

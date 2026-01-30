@@ -130,3 +130,14 @@ def test_compare_secrets_missing_in_dst():
     assert row[3] is None
 
 
+def test_parse_mount_point_and_base_path():
+    parser = argparse.ArgumentParser()
+    compare.create_parser(parser)
+    args = parser.parse_args([
+        '-s', 'http://localhost:8200',
+        '-d', 'http://localhost:8201',
+        '--mount-point', 'secret-alt',
+        '--base-path', 'apps/team'
+    ])
+    assert args.mount_point == 'secret-alt'
+    assert args.base_path == 'apps/team'

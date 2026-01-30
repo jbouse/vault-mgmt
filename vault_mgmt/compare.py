@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 
 from tqdm import tqdm
 
+from .auth import load_auth_config, resolve_auth_config
 from .manager import VaultManager
 
 __all__ = ["create_parser", "main"]
@@ -29,7 +30,19 @@ def create_parser(parser):
     )
     parser.add_argument("-r", "--oidc-role", help="OIDC role for authentication")
     parser.add_argument(
-        "-b", "--base-path", default="", help="Base path for secrets to synchronize"
+        "--auth-config",
+        help="Path to YAML auth config file (optional).",
+    )
+    parser.add_argument(
+        "-b",
+        "--base-path",
+        default="",
+        help="Base path within the mount to compare (default: root).",
+    )
+    parser.add_argument(
+        "--mount-point",
+        default="secret",
+        help="Secret mount point to compare (default: secret).",
     )
     parser.add_argument(
         "-o",
@@ -43,12 +56,44 @@ def create_parser(parser):
         default=[],
         help="Path to ignore during comparison. Can be specified multiple times.",
     )
+    parser.add_argument(
+        "--source-auth-method",
+        help="Auth method for source Vault (default: oidc).",
+    )
+    parser.add_argument(
+        "--source-auth-mount",
+        help="Auth mount path for source Vault (kubernetes auth).",
+    )
+    parser.add_argument(
+        "--source-auth-role",
+        help="Auth role for source Vault (oidc/kubernetes).",
+    )
+    parser.add_argument(
+        "--source-auth-jwt-path",
+        help="JWT path for source Vault (kubernetes auth).",
+    )
+    parser.add_argument(
+        "--dest-auth-method",
+        help="Auth method for destination Vault (default: oidc).",
+    )
+    parser.add_argument(
+        "--dest-auth-mount",
+        help="Auth mount path for destination Vault (kubernetes auth).",
+    )
+    parser.add_argument(
+        "--dest-auth-role",
+        help="Auth role for destination Vault (oidc/kubernetes).",
+    )
+    parser.add_argument(
+        "--dest-auth-jwt-path",
+        help="JWT path for destination Vault (kubernetes auth).",
+    )
 
 
-def authenticate_vault(addr, oidc_role):
+def authenticate_vault(addr, auth_config, oidc_role):
     vault = VaultManager(addr)
     try:
-        vault.authenticate_with_oidc(oidc_role=oidc_role)
+        vault.authenticate(auth_config, oidc_role=oidc_role)
         print(f"Authenticated with Vault at {addr}")
         return vault
     except Exception as e:
@@ -56,8 +101,10 @@ def authenticate_vault(addr, oidc_role):
         return None
 
 
-def get_filtered_secret_paths(vault, base_path, ignore_paths):
-    paths = set(vault.list_all_secret_paths(base_path=base_path))
+def get_filtered_secret_paths(vault, base_path, ignore_paths, mount_point):
+    paths = set(
+        vault.list_all_secret_paths(base_path=base_path, mount_point=mount_point)
+    )
     for ignore in ignore_paths:
         paths = {p for p in paths if ignore not in p}
     return paths
@@ -138,22 +185,48 @@ def write_results_to_csv(results, args):
 
 def main(args):
     """Main logic for comparing secrets."""
-    source_vault = authenticate_vault(args.source_vault_addr, args.oidc_role)
+    mount_point = args.mount_point.strip("/") if args.mount_point else "secret"
+    config_data = load_auth_config(args.auth_config)
+    source_auth = resolve_auth_config(
+        cli_method=args.source_auth_method,
+        cli_mount=args.source_auth_mount,
+        cli_role=args.source_auth_role,
+        cli_jwt_path=args.source_auth_jwt_path,
+        env_prefix="VAULT_SRC",
+        config_section=config_data.get("source"),
+        oidc_role_fallback=args.oidc_role,
+    )
+    dest_auth = resolve_auth_config(
+        cli_method=args.dest_auth_method,
+        cli_mount=args.dest_auth_mount,
+        cli_role=args.dest_auth_role,
+        cli_jwt_path=args.dest_auth_jwt_path,
+        env_prefix="VAULT_DST",
+        config_section=config_data.get("destination"),
+        oidc_role_fallback=args.oidc_role,
+    )
+    source_vault = authenticate_vault(
+        args.source_vault_addr, source_auth, args.oidc_role
+    )
     if not source_vault:
         return
-    destination_vault = authenticate_vault(args.destination_vault_addr, args.oidc_role)
+    destination_vault = authenticate_vault(
+        args.destination_vault_addr, dest_auth, args.oidc_role
+    )
     if not destination_vault:
         return
-    print(f"Listing secret paths from source Vault at base path '{args.base_path}/'...")
+    print(
+        f"Listing secret paths from source Vault at mount '{mount_point}' and base path '{args.base_path}/'..."
+    )
     source_secret_paths = get_filtered_secret_paths(
-        source_vault, args.base_path, args.ignore_path
+        source_vault, args.base_path, args.ignore_path, mount_point
     )
     print(f"Found {len(source_secret_paths)} secret paths in source.")
     print(
-        f"Listing secret paths from destination Vault at base path '{args.base_path}/'..."
+        f"Listing secret paths from destination Vault at mount '{mount_point}' and base path '{args.base_path}/'..."
     )
     destination_secret_paths = get_filtered_secret_paths(
-        destination_vault, args.base_path, args.ignore_path
+        destination_vault, args.base_path, args.ignore_path, mount_point
     )
     print(f"Found {len(destination_secret_paths)} secret paths in destination.")
     common_paths = source_secret_paths & destination_secret_paths

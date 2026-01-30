@@ -25,7 +25,7 @@ jobs:
 
     steps:
       - name: Setup | Checkout Repository on Release Branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
@@ -76,21 +76,21 @@ jobs:
       - name: Action | Semantic Version Release
         id: release
         # Adjust tag with desired version if applicable.
-        uses: python-semantic-release/python-semantic-release@v10.1.0
+        uses: python-semantic-release/python-semantic-release@v10.5.3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           git_committer_name: "github-actions"
           git_committer_email: "actions@users.noreply.github.com"
 
       - name: Publish | Upload to GitHub Release Assets
-        uses: python-semantic-release/publish-action@v10.1.0
+        uses: python-semantic-release/publish-action@v10.5.3
         if: steps.release.outputs.released == 'true'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.release.outputs.tag }}
 
       - name: Upload | Distribution Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: distribution-artifacts
           path: dist/
@@ -117,7 +117,7 @@ jobs:
 
     steps:
       - name: Setup | Download Build Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         id: artifact-download
         with:
           name: distribution-artifacts
