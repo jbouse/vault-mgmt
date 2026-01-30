@@ -92,5 +92,4 @@ exclude_commit_patterns = [
   # Old semantic-release version commits
   '''^\d+\.\d+\.\d+''',
 ]
-insertion_flag = "=========\nCHANGELOG\n========="
 mode = "update"
