@@ -75,8 +75,17 @@ class VaultManager:
 
         class AuthHandler(BaseHTTPRequestHandler):
             def do_GET(self):
-                params = urllib.parse.parse_qs(self.path.split("?")[1])
-                self.server.token = params["code"][0]  # type: ignore
+                if "?" not in self.path:
+                    self.send_response(400)
+                    self.end_headers()
+                    return
+                params = urllib.parse.parse_qs(self.path.split("?", 1)[1])
+                code = params.get("code", [None])[0]
+                if not code:
+                    self.send_response(400)
+                    self.end_headers()
+                    return
+                self.server.token = code  # type: ignore
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(str.encode(SELF_CLOSING_PAGE))
@@ -84,8 +93,9 @@ class VaultManager:
             def log_message(self, format, *args):
                 pass  # Disable logging to the console
 
-        server_address = ("", OIDC_CALLBACK_PORT)
+        server_address = ("127.0.0.1", OIDC_CALLBACK_PORT)
         httpd = HttpServ(server_address, AuthHandler)
+        httpd.timeout = 300
         httpd.handle_request()
         return httpd.token
 
@@ -105,7 +115,11 @@ class VaultManager:
             return None
 
         try:
-            # The read_health_status method provides server information including the version
+            # Prefer health status for version; fall back to seal status if needed.
+            response = self.client.sys.read_health_status()  # type: ignore
+            version = response.get("version")
+            if version:
+                return version
             response = self.client.sys.read_seal_status()  # type: ignore
             return response.get("version")
         except hvac.exceptions.VaultError as e:  # type: ignore

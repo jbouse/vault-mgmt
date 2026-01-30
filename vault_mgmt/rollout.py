@@ -36,6 +36,11 @@ def create_parser(parser):
         default=None,
         help="The kubeconfig context to use. If not specified, uses the current context or in-cluster config.",
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit non-zero if rollout steps time out instead of continuing.",
+    )
 
 
 def main(args):
@@ -60,7 +65,9 @@ def main(args):
         print("Could not determine initial Vault version. Exiting.")
         sys.exit(1)
 
-    perform_vault_rollout(args.namespace, vault_client, args.kube_context)
+    perform_vault_rollout(
+        args.namespace, vault_client, args.kube_context, strict=args.strict
+    )
 
 
 def load_kube_config_or_incluster(context_to_load):
@@ -85,7 +92,7 @@ def load_kube_config_or_incluster(context_to_load):
     return client.CoreV1Api()
 
 
-def rollout_standby_pods(k8s_core_v1, namespace):
+def rollout_standby_pods(k8s_core_v1, namespace, strict):
     print("\n--- Phase 1: Rolling out standby pods ---")
     try:
         standby_pods = k8s_core_v1.list_namespaced_pod(
@@ -98,6 +105,7 @@ def rollout_standby_pods(k8s_core_v1, namespace):
                 pbar.set_description(f"Deleting pod {pod_name}")
                 k8s_core_v1.delete_namespaced_pod(name=pod_name, namespace=namespace)
                 pbar.set_description(f"Waiting for {pod_name} to be ready")
+                pod_ready = False
                 w = watch.Watch()
                 for event in w.stream(
                     k8s_core_v1.list_namespaced_pod,
@@ -107,14 +115,21 @@ def rollout_standby_pods(k8s_core_v1, namespace):
                 ):
                     new_pod = event["object"]  # type: ignore
                     if new_pod.metadata.uid != pod_uid and is_pod_ready(new_pod):  # type: ignore
+                        pod_ready = True
                         w.stop()
                         break
+                if not pod_ready:
+                    msg = f"Timed out waiting for standby pod {pod_name} to be ready."
+                    if strict:
+                        print(msg)
+                        sys.exit(1)
+                    print(f"Warning: {msg}")
     except ApiException as e:
         print(f"Error handling standby pods: {e}")
         sys.exit(1)
 
 
-def handle_active_pod(k8s_core_v1, namespace, vault_client):
+def handle_active_pod(k8s_core_v1, namespace, vault_client, strict):
     print("\n--- Phase 2: Handling active pod ---")
     try:
         with tqdm(total=5, desc="Active Pod Steps") as pbar:
@@ -135,6 +150,7 @@ def handle_active_pod(k8s_core_v1, namespace, vault_client):
             vault_client.step_down()
             pbar.update(1)
             pbar.set_description("Waiting for new leader")
+            new_leader_ready = False
             w = watch.Watch()
             for event in w.stream(
                 k8s_core_v1.list_namespaced_pod,
@@ -144,9 +160,16 @@ def handle_active_pod(k8s_core_v1, namespace, vault_client):
             ):
                 pod = event["object"]  # type: ignore
                 if pod.metadata.name != old_active_pod_name and is_pod_ready(pod):  # type: ignore
+                    new_leader_ready = True
                     pbar.set_description(f"New leader {pod.metadata.name} ready")  # type: ignore
                     w.stop()
                     break
+            if not new_leader_ready:
+                msg = "Timed out waiting for a new active leader to become ready."
+                if strict:
+                    print(msg)
+                    sys.exit(1)
+                print(f"Warning: {msg}")
             pbar.update(1)
             pbar.set_description(f"Deleting old pod {old_active_pod_name}")
             k8s_core_v1.delete_namespaced_pod(
@@ -154,6 +177,7 @@ def handle_active_pod(k8s_core_v1, namespace, vault_client):
             )
             pbar.update(1)
             pbar.set_description(f"Waiting for {old_active_pod_name} to restart")
+            old_pod_restarted = False
             w = watch.Watch()
             for event in w.stream(
                 k8s_core_v1.list_namespaced_pod,
@@ -163,8 +187,15 @@ def handle_active_pod(k8s_core_v1, namespace, vault_client):
             ):
                 restarted_pod = event["object"]  # type: ignore
                 if restarted_pod.metadata.uid != old_active_pod_uid and is_pod_ready(restarted_pod):  # type: ignore
+                    old_pod_restarted = True
                     w.stop()
                     break
+            if not old_pod_restarted:
+                msg = f"Timed out waiting for {old_active_pod_name} to restart."
+                if strict:
+                    print(msg)
+                    sys.exit(1)
+                print(f"Warning: {msg}")
             pbar.update(1)
         print("Vault rollout complete.")
         print("\nConfirming Vault version post-rollout...")
@@ -178,8 +209,8 @@ def handle_active_pod(k8s_core_v1, namespace, vault_client):
 
 
 def perform_vault_rollout(
-    namespace: str, vault_client: VaultManager, kube_context: str
+    namespace: str, vault_client: VaultManager, kube_context: str, strict: bool
 ):
     k8s_core_v1 = load_kube_config_or_incluster(kube_context)
-    rollout_standby_pods(k8s_core_v1, namespace)
-    handle_active_pod(k8s_core_v1, namespace, vault_client)
+    rollout_standby_pods(k8s_core_v1, namespace, strict)
+    handle_active_pod(k8s_core_v1, namespace, vault_client, strict)
