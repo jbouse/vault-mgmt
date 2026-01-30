@@ -4,6 +4,7 @@ from kubernetes import client, config, watch
 from kubernetes.client.rest import ApiException
 from tqdm import tqdm
 
+from .auth import load_auth_config, resolve_auth_config
 from .manager import VaultManager
 
 __all__ = ["create_parser", "main"]
@@ -32,6 +33,26 @@ def create_parser(parser):
     )
     parser.add_argument("-r", "--oidc-role", help="OIDC role for Vault authentication")
     parser.add_argument(
+        "--auth-config",
+        help="Path to YAML auth config file (optional).",
+    )
+    parser.add_argument(
+        "--auth-method",
+        help="Auth method for Vault (default: oidc).",
+    )
+    parser.add_argument(
+        "--auth-mount",
+        help="Auth mount path for Vault (kubernetes auth).",
+    )
+    parser.add_argument(
+        "--auth-role",
+        help="Auth role for Vault (oidc/kubernetes).",
+    )
+    parser.add_argument(
+        "--auth-jwt-path",
+        help="JWT path for Vault (kubernetes auth).",
+    )
+    parser.add_argument(
         "--kube-context",
         default=None,
         help="The kubeconfig context to use. If not specified, uses the current context or in-cluster config.",
@@ -47,8 +68,18 @@ def main(args):
     """Main logic for rolling restart."""
     # Initialize and authenticate VaultManager
     vault_client = VaultManager(args.vault_addr)
+    config_data = load_auth_config(args.auth_config)
+    auth_config = resolve_auth_config(
+        cli_method=args.auth_method,
+        cli_mount=args.auth_mount,
+        cli_role=args.auth_role,
+        cli_jwt_path=args.auth_jwt_path,
+        env_prefix="VAULT",
+        config_section=config_data.get("rollout"),
+        oidc_role_fallback=args.oidc_role,
+    )
     try:
-        vault_client.authenticate_with_oidc(oidc_role=args.oidc_role)
+        vault_client.authenticate(auth_config, oidc_role=args.oidc_role)
         print(f"Authenticated with Vault at {args.vault_addr}")
     except Exception as e:
         print(f"Failed to authenticate with Vault: {e}")

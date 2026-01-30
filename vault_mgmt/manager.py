@@ -3,6 +3,8 @@ import webbrowser
 
 import hvac
 
+from .auth import AuthConfig
+
 OIDC_CALLBACK_PORT = 8250
 OIDC_REDIRECT_URI = f"http://localhost:{OIDC_CALLBACK_PORT}/oidc/callback"
 SELF_CLOSING_PAGE = """
@@ -98,6 +100,36 @@ class VaultManager:
         httpd.timeout = 300
         httpd.handle_request()
         return httpd.token
+
+    def authenticate_with_kubernetes(self, auth_config: AuthConfig):
+        if not auth_config.role:
+            raise ValueError("Kubernetes auth requires a role.")
+        if not auth_config.jwt_path:
+            raise ValueError("Kubernetes auth requires a JWT path.")
+        self.client = hvac.Client(url=self.vault_addr)
+        with open(auth_config.jwt_path) as fin:
+            jwt = fin.read().strip()
+        try:
+            response = self.client.auth.kubernetes.login(
+                role=auth_config.role,
+                jwt=jwt,
+                mount_point=auth_config.mount or "kubernetes",
+            )
+            if response and "auth" in response and "client_token" in response["auth"]:
+                self.client.token = response["auth"]["client_token"]
+            return self.client
+        except Exception as e:
+            print(f"Kubernetes authentication failed for {self.vault_addr}: {e}")
+            raise
+
+    def authenticate(self, auth_config: AuthConfig, oidc_role=None):
+        method = auth_config.method or "oidc"
+        if method == "oidc":
+            role = auth_config.role or oidc_role
+            return self.authenticate_with_oidc(oidc_role=role)
+        if method == "kubernetes":
+            return self.authenticate_with_kubernetes(auth_config)
+        raise ValueError(f"Unsupported auth method: {method}")
 
     def is_authenticated(self):
         """Checks if the client is initialized and has a valid token."""
