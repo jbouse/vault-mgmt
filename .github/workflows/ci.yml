@@ -7,6 +7,10 @@ on:
     branches: [ "main" ]
     types: [assigned, opened, synchronize, reopened]
 
+# Limit workflow permissions for security
+permissions:
+  contents: read
+
 jobs:
   build:
 

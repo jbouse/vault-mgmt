@@ -90,7 +90,17 @@ def create_parser(parser):
     )
 
 
-def authenticate_vault(addr, auth_config, oidc_role):
+def authenticate_vault(addr, auth_config=None, oidc_role=None):
+    if auth_config is None:
+        auth_config = resolve_auth_config(
+            cli_method=None,
+            cli_mount=None,
+            cli_role=None,
+            cli_jwt_path=None,
+            env_prefix=None,
+            config_section=None,
+            oidc_role_fallback=oidc_role,
+        )
     vault = VaultManager(addr)
     try:
         vault.authenticate(auth_config, oidc_role=oidc_role)
@@ -101,7 +111,7 @@ def authenticate_vault(addr, auth_config, oidc_role):
         return None
 
 
-def get_filtered_secret_paths(vault, base_path, ignore_paths, mount_point):
+def get_filtered_secret_paths(vault, base_path, ignore_paths, mount_point="secret"):
     paths = set(
         vault.list_all_secret_paths(base_path=base_path, mount_point=mount_point)
     )
@@ -109,8 +119,39 @@ def get_filtered_secret_paths(vault, base_path, ignore_paths, mount_point):
         paths = {p for p in paths if ignore not in p}
     return paths
 
-
 def compare_secrets(source_vault, dest_vault, common_paths):
+    """
+    Compare secrets at specified paths between two VaultManager instances.
+
+    For each path in `paths`, this function compares the key-value pairs in the source and destination Vaults.
+    If a key exists in the source but is missing or has a different value in the destination, a row is added to the result.
+
+    Args:
+        source_vault (VaultManager): The source Vault client.
+        dstdest_vault (VaultManager): The destination Vault client.
+        common_paths (Iterable[str]): Iterable of secret paths to compare. Only paths present in the source are compared.
+
+    Returns:
+        List[List]: A list of lists, where each inner list represents a difference and contains:
+            - secret_path (str): The secret path.
+            - field (str): The key within the secret.
+            - source_value (Any): The value from the source Vault (may be None).
+            - dest_value (Any): The value from the destination Vault (may be None).
+
+    Example:
+        [
+            ["foo/bar", "password", "s3cr3t", None],           # Key missing in destination
+            ["foo/bar", "username", "admin", "user"],          # Value differs
+        ]
+
+    Notes:
+        - Only paths present in the source are compared.
+        - If a path is missing in the destination, all keys from the source are reported with dest_value as None.
+        - If a key is missing in the destination, dest_value is None.
+        - If a key's value differs, both source_value and dest_value are shown.
+        - No output is produced for keys that are identical in both Vaults.
+        - Prints an error message to stdout if comparison of a path fails.
+    """
     results = []
     for secret_path in tqdm(common_paths, desc="Comparing secrets"):
         try:
