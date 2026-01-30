@@ -90,7 +90,17 @@ def create_parser(parser):
     )
 
 
-def authenticate_vault(addr, auth_config, oidc_role):
+def authenticate_vault(addr, auth_config=None, oidc_role=None):
+    if auth_config is None:
+        auth_config = resolve_auth_config(
+            cli_method=None,
+            cli_mount=None,
+            cli_role=None,
+            cli_jwt_path=None,
+            env_prefix=None,
+            config_section=None,
+            oidc_role_fallback=oidc_role,
+        )
     vault = VaultManager(addr)
     try:
         vault.authenticate(auth_config, oidc_role=oidc_role)
@@ -101,7 +111,7 @@ def authenticate_vault(addr, auth_config, oidc_role):
         return None
 
 
-def get_filtered_secret_paths(vault, base_path, ignore_paths, mount_point):
+def get_filtered_secret_paths(vault, base_path, ignore_paths, mount_point="secret"):
     paths = set(
         vault.list_all_secret_paths(base_path=base_path, mount_point=mount_point)
     )
