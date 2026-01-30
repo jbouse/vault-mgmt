@@ -1,6 +1,7 @@
 import csv
 from urllib.parse import urlparse
 
+from .auth import load_auth_config, resolve_auth_config
 from .manager import VaultManager
 
 __all__ = ["create_parser", "main"]
@@ -22,6 +23,10 @@ def create_parser(parser):
     )
     parser.add_argument("-r", "--oidc-role", help="OIDC role for authentication")
     parser.add_argument(
+        "--auth-config",
+        help="Path to YAML auth config file (optional).",
+    )
+    parser.add_argument(
         "-o",
         "--override-secrets",
         help="Path to a CSV file with secrets to override during restore",
@@ -30,12 +35,44 @@ def create_parser(parser):
         "--override-column",
         help="Name of the column in the override CSV to use for values. Defaults to the destination hostname.",
     )
+    parser.add_argument(
+        "--source-auth-method",
+        help="Auth method for source Vault (default: oidc).",
+    )
+    parser.add_argument(
+        "--source-auth-mount",
+        help="Auth mount path for source Vault (kubernetes auth).",
+    )
+    parser.add_argument(
+        "--source-auth-role",
+        help="Auth role for source Vault (oidc/kubernetes).",
+    )
+    parser.add_argument(
+        "--source-auth-jwt-path",
+        help="JWT path for source Vault (kubernetes auth).",
+    )
+    parser.add_argument(
+        "--dest-auth-method",
+        help="Auth method for destination Vault (default: oidc).",
+    )
+    parser.add_argument(
+        "--dest-auth-mount",
+        help="Auth mount path for destination Vault (kubernetes auth).",
+    )
+    parser.add_argument(
+        "--dest-auth-role",
+        help="Auth role for destination Vault (oidc/kubernetes).",
+    )
+    parser.add_argument(
+        "--dest-auth-jwt-path",
+        help="JWT path for destination Vault (kubernetes auth).",
+    )
 
 
-def authenticate_vault(addr, oidc_role):
+def authenticate_vault(addr, auth_config, oidc_role):
     vault = VaultManager(addr)
     try:
-        vault.authenticate_with_oidc(oidc_role=oidc_role)
+        vault.authenticate(auth_config, oidc_role=oidc_role)
         print(f"Authenticated with Vault at {addr}")
         return vault
     except Exception as e:
@@ -78,10 +115,12 @@ def take_and_restore_snapshot(source_vault, destination_vault):
         return None
 
 
-def apply_overrides_if_needed(result, args, destination_vault, dest_hostname):
+def apply_overrides_if_needed(
+    result, args, destination_vault, dest_hostname, auth_config, oidc_role
+):
     if result is None or result.status_code != 204 or args.override_secrets is None:
         return
-    destination_vault.authenticate_with_oidc(oidc_role=args.oidc_role)
+    destination_vault.authenticate(auth_config, oidc_role=oidc_role)
     print(f"Applying overrides to destination Vault at {args.destination_vault_addr}")
     with open(args.override_secrets) as fin:
         reader = csv.reader(fin, dialect="excel-tab")
@@ -122,14 +161,39 @@ def apply_overrides_if_needed(result, args, destination_vault, dest_hostname):
 
 
 def main(args):
-    source_vault = authenticate_vault(args.source_vault_addr, args.oidc_role)
+    config_data = load_auth_config(args.auth_config)
+    source_auth = resolve_auth_config(
+        cli_method=args.source_auth_method,
+        cli_mount=args.source_auth_mount,
+        cli_role=args.source_auth_role,
+        cli_jwt_path=args.source_auth_jwt_path,
+        env_prefix="VAULT_SRC",
+        config_section=config_data.get("source"),
+        oidc_role_fallback=args.oidc_role,
+    )
+    dest_auth = resolve_auth_config(
+        cli_method=args.dest_auth_method,
+        cli_mount=args.dest_auth_mount,
+        cli_role=args.dest_auth_role,
+        cli_jwt_path=args.dest_auth_jwt_path,
+        env_prefix="VAULT_DST",
+        config_section=config_data.get("destination"),
+        oidc_role_fallback=args.oidc_role,
+    )
+    source_vault = authenticate_vault(
+        args.source_vault_addr, source_auth, args.oidc_role
+    )
     if not source_vault:
         return
-    destination_vault = authenticate_vault(args.destination_vault_addr, args.oidc_role)
+    destination_vault = authenticate_vault(
+        args.destination_vault_addr, dest_auth, args.oidc_role
+    )
     if not destination_vault:
         return
     dest_hostname = urlparse(args.destination_vault_addr).hostname
     if not confirm_destructive_action(dest_hostname, args.destination_vault_addr):
         return
     result = take_and_restore_snapshot(source_vault, destination_vault)
-    apply_overrides_if_needed(result, args, destination_vault, dest_hostname)
+    apply_overrides_if_needed(
+        result, args, destination_vault, dest_hostname, dest_auth, args.oidc_role
+    )

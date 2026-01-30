@@ -43,12 +43,59 @@ All commands support `--help` for more options.
 
 ---
 
+## Authentication
+
+OIDC is the default (interactive) auth method. You can also use Kubernetes auth for non-interactive runs.
+
+### Kubernetes auth (non-interactive)
+
+```bash
+vault-mgmt compare \
+  --source-vault-addr ... \
+  --destination-vault-addr ... \
+  --source-auth-method kubernetes \
+  --source-auth-mount k8s-cluster-a \
+  --source-auth-role vault-read \
+  --dest-auth-method kubernetes \
+  --dest-auth-mount k8s-cluster-b \
+  --dest-auth-role vault-write
+```
+
+### YAML auth config
+
+```yaml
+source:
+  method: kubernetes
+  mount: k8s-cluster-a
+  role: vault-read
+  jwt_path: /var/run/secrets/kubernetes.io/serviceaccount/token
+destination:
+  method: kubernetes
+  mount: k8s-cluster-b
+  role: vault-write
+rollout:
+  method: oidc
+  role: my-oidc-role
+```
+
+Use it with `--auth-config path/to/auth.yml`. CLI args and env vars override the file.
+
+Env var prefixes:
+
+- `VAULT_SRC_*` for source (compare/sync)
+- `VAULT_DST_*` for destination (compare/sync)
+- `VAULT_*` for rollout
+
+Keys: `AUTH_METHOD`, `AUTH_MOUNT`, `AUTH_ROLE`, `AUTH_JWT_PATH`.
+
+---
+
 ## Example Workflows
 
 ### Compare Vaults
 
 ```bash
-vault-mgmt compare --source-vault-addr ... --destination-vault-addr ... --output-file differences.csv
+vault-mgmt compare --source-vault-addr ... --destination-vault-addr ... --mount-point secret --base-path app --output-file differences.csv
 ```
 
 ### Sync Vaults with Overrides
@@ -60,8 +107,12 @@ vault-mgmt sync --source-vault-addr ... --destination-vault-addr ... --override-
 ### Kubernetes Rollout
 
 ```bash
-vault-mgmt rollout vault-namespace --vault-addr ... --kube-context ...
+vault-mgmt rollout vault-namespace --vault-addr ... --kube-context ... --strict
 ```
+
+The `--strict` flag exits non-zero when rollout steps time out instead of continuing.
+
+The OIDC browser callback listener binds to `127.0.0.1` and waits up to 5 minutes for the auth response.
 
 ---
 
