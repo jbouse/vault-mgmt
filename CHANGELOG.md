@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v1.1.2 (2026-01-30)
+
+### Bug Fixes
+
+- Remove insertion_flag from changelog configuration
+  ([`5938ab2`](https://github.com/jbouse/vault-mgmt/commit/5938ab2a57d48dbf21eff864b1628bd4eaa92c87))
+
+
 ## v1.0.0 (2025-06-19)
 
 ### Bug Fixes
