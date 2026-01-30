@@ -18,8 +18,11 @@ class AuthConfig:
 def load_auth_config(path: Optional[str]) -> dict[str, Any]:
     if not path:
         return {}
-    with open(path) as fin:
-        data = yaml.safe_load(fin)
+    try:
+        with open(path) as fin:
+            data = yaml.safe_load(fin)
+    except FileNotFoundError:
+        raise ValueError(f"Auth config file not found at: {path}")
     if not data:
         return {}
     if not isinstance(data, dict):

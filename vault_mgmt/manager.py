@@ -107,8 +107,11 @@ class VaultManager:
         if not auth_config.jwt_path:
             raise ValueError("Kubernetes auth requires a JWT path.")
         self.client = hvac.Client(url=self.vault_addr)
-        with open(auth_config.jwt_path) as fin:
-            jwt = fin.read().strip()
+        try:
+            with open(auth_config.jwt_path) as fin:
+                jwt = fin.read().strip()
+        except FileNotFoundError:
+            raise ValueError(f"Kubernetes auth JWT file not found at: {auth_config.jwt_path}")
         try:
             response = self.client.auth.kubernetes.login(
                 role=auth_config.role,
