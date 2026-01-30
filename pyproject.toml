@@ -30,7 +30,7 @@ dependencies = [
     "certifi==2025.6.15",
     "charset-normalizer==3.4.2",
     "hvac==2.4.0",
-    "idna==3.10",
+    "idna==3.11",
     "kubernetes==33.1.0",
     "PyYAML==6.0.2",
     "requests==2.32.4",
